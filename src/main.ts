@@ -1,3 +1,4 @@
+// model for each particle: current position, home position, velocity, and radius
 type Particle = {
   x: number;
   y: number;
@@ -7,3 +8,23 @@ type Particle = {
   vy: number;
   radius: number;
 }
+
+const canvas = document.querySelector(
+  "#particle-canvas"
+) as HTMLCanvasElement
+
+const hero = document.querySelector(
+  ".hero"
+) as HTMLElement;
+
+const ctx = canvas.getContext("2d")
+
+if (!ctx) {
+  throw new Error("Unable to create a 2D canvas context")
+}
+
+const particles: Particle[] = [];
+
+let width = 0;
+let height = 0;
+let dpr = 1;
