@@ -137,3 +137,18 @@ function getPointerVelocity() {
     y: pointer.y - pointer.previousY
   }
 }
+
+// draw the particles
+function drawParticle(particle: Particle) {
+  ctx.fillStyle = settings.color;
+
+  ctx.beginPath();
+  ctx.arc(
+    particle.x,
+    particle.y,
+    particle.radius,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+}
