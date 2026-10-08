@@ -20,10 +20,10 @@ body {
 
 .hero {
   position: relative;
-  min-height: 520px;
+  min-height: 100vh;
   overflow: hidden;
   isolation: isolate;
-  background: #1265ef;
+  background: #7e8692;
 }
 
 .hero-image,
@@ -35,13 +35,13 @@ body {
 }
 
 .hero-image {
-  z-index: -2;
-  background: url("./assets/hero-bg.webp") center cover no-repeat;
+  z-index: 0;
+  background: url("./assets/hero-bg.webp") center / cover no-repeat;
 }
 
 .hero-content {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   min-height: 520px;
   place-content: center;
@@ -60,4 +60,10 @@ h1 {
   font-size: clamp(3rem, 10vw, 9rem);
   line-height: 0.85;
   letter-spacing: -0.07em;
+}
+
+#particle-canvas {
+  z-index: 1;
+  display: block;
+  pointer-events: none;
 }
