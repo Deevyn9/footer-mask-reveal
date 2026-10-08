@@ -18,11 +18,13 @@ const hero = document.querySelector(
   ".hero"
 ) as HTMLElement;
 
-const ctx = canvas.getContext("2d")
+const context = canvas.getContext("2d")
 
-if (!ctx) {
+if (!context) {
   throw new Error("Unable to create a 2D canvas context")
 }
+
+const ctx: CanvasRenderingContext2D = context;
 
 const particles: Particle[] = [];
 
@@ -40,7 +42,7 @@ const settings = {
   influenceRadius: 50,
 
   pushStrength: 1.8,
-  flowStrenght: 0.1,
+  flowStrength: 0.1,
 
   springStrength: 0.012,
   damping: 0.9,
@@ -138,6 +140,55 @@ function getPointerVelocity() {
   }
 }
 
+// update the particles
+function updateParticle(
+  particle: Particle,
+  pointerVelocity: { x: number; y: number }
+) {
+  const dx = particle.x - pointer.x;
+  const dy = particle.y - pointer.y;
+  const distance = Math.hypot(dx, dy);
+
+  if (
+    pointer.active &&
+    distance > 0 &&
+    distance < settings.influenceRadius
+  ) {
+    const falloff =
+      1 - distance / settings.influenceRadius;
+
+    const radialForce =
+      falloff * falloff * settings.pushStrength;
+
+    const normalX = dx / distance;
+    const normalY = dy / distance;
+
+    // Push away from the pointer.
+    particle.vx += normalX * radialForce;
+    particle.vy += normalY * radialForce;
+
+    // Carry particles slightly in the pointer's direction.
+    particle.vx += pointerVelocity.x * falloff * settings.flowStrength;
+    particle.vy += pointerVelocity.y * falloff * settings.flowStrength;
+  }
+
+  // Spring force: return to the original grid position.
+  particle.vx +=
+    (particle.homeX - particle.x) *
+    settings.springStrength;
+
+  particle.vy +=
+    (particle.homeY - particle.y) *
+    settings.springStrength;
+
+  // Damping: remove energy gradually.
+  particle.vx *= settings.damping;
+  particle.vy *= settings.damping;
+
+  particle.x += particle.vx;
+  particle.y += particle.vy;
+}
+
 // draw the particles
 function drawParticle(particle: Particle) {
   ctx.fillStyle = settings.color;
@@ -152,3 +203,25 @@ function drawParticle(particle: Particle) {
   );
   ctx.fill();
 }
+
+// create animation loop
+function render() {
+  ctx.clearRect(0, 0, width, height);
+
+  const pointerVelocity = getPointerVelocity();
+
+  for (const particle of particles) {
+    updateParticle(particle, pointerVelocity);
+    drawParticle(particle);
+  }
+
+  pointer.previousX = pointer.x;
+  pointer.previousY = pointer.y;
+
+  requestAnimationFrame(render);
+}
+
+window.addEventListener("resize", resize);
+
+resize();
+render();
