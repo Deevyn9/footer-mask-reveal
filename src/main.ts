@@ -28,3 +28,19 @@ const particles: Particle[] = [];
 let width = 0;
 let height = 0;
 let dpr = 1;
+
+const settings = {
+  spacing: 4,
+  minRadius: 1.25,
+  maxRadius: 1.9,
+
+  influenceRadius: 50,
+
+  pushStrength: 1.8,
+  flowStrenght: 0.1,
+
+  springStrength: 0.012,
+  damping: 0.9,
+
+  color: "#1265ef"
+}
