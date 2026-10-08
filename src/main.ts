@@ -77,3 +77,51 @@ hero.addEventListener("pointermove", (event) => {
 hero.addEventListener("pointerleave", () => {
   pointer.active = false;
 })
+
+// resize and generate particles
+function resize() {
+  const rect = hero.getBoundingClientRect()
+
+  width = rect.width;
+  height = rect.height;
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  canvas.width = Math.round(width * dpr);
+  canvas.height = Math.round(height * dpr);
+
+  canvas.style.width = `${width}px`
+  canvas.style.height = `${height}px`
+
+  ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  createParticles()
+}
+
+function createParticles() {
+  particles.length = 0
+
+   for (
+    let y = settings.spacing / 2;
+    y < height;
+    y += settings.spacing
+  ) {
+    for (
+      let x = settings.spacing / 2;
+      x < width;
+      x += settings.spacing
+    ) {
+      particles.push({
+        x,
+        y,
+        homeX: x,
+        homeY: y,
+        vx: 0,
+        vy: 0,
+        radius:
+          settings.minRadius +
+          Math.random() *
+            (settings.maxRadius - settings.minRadius)
+      });
+    }
+  }
+}
