@@ -125,3 +125,15 @@ function createParticles() {
     }
   }
 }
+
+// calculate cursor velocity
+function getPointerVelocity() {
+  if (!pointer.active) {
+    return { x: 0, y: 0 }
+  }
+
+  return {
+    x: pointer.x - pointer.previousX,
+    y: pointer.y - pointer.previousY
+  }
+}
