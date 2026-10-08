@@ -1,108 +1,151 @@
-// model for each particle: current position, home position, velocity, and radius
 type Particle = {
   x: number;
   y: number;
+
   homeX: number;
   homeY: number;
+
   vx: number;
   vy: number;
+};
+
+type RevealStamp = {
+  x: number;
+  y: number;
   radius: number;
+  strength: number;
+};
+
+const canvasElement = document.querySelector(
+  "#particle-canvas"
+);
+
+const heroElement = document.querySelector(".hero");
+
+if (!(canvasElement instanceof HTMLCanvasElement)) {
+  throw new Error("Could not find #particle-canvas");
 }
 
-//set-up canvas
-const canvas = document.querySelector(
-  "#particle-canvas"
-) as HTMLCanvasElement
+if (!(heroElement instanceof HTMLElement)) {
+  throw new Error("Could not find .hero");
+}
 
-const hero = document.querySelector(
-  ".hero"
-) as HTMLElement;
+const canvas = canvasElement;
+const hero = heroElement;
 
-const context = canvas.getContext("2d")
+const context = canvas.getContext("2d");
 
 if (!context) {
-  throw new Error("Unable to create a 2D canvas context")
+  throw new Error("Unable to create a 2D canvas context");
 }
 
 const ctx: CanvasRenderingContext2D = context;
 
 const particles: Particle[] = [];
+const revealStamps: RevealStamp[] = [];
 
 let width = 0;
 let height = 0;
 let dpr = 1;
 
-
-// define physics
 const settings = {
-  spacing: 4,
-  minRadius: 1.25,
-  maxRadius: 1.9,
+  // Use fewer structural particles for better performance.
+  spacing: 12,
 
+  // Cursor influence.
   influenceRadius: 50,
 
-  pushStrength: 1.8,
-  flowStrength: 0.1,
+  // Strength of particle displacement.
+  pushStrength: 5,
 
-  springStrength: 0.012,
-  damping: 0.9,
+  // Cursor movement carried into the field.
+  flowStrength: 0.2,
 
-  color: "#1265ef"
-}
+  // Slow return creates a liquid feel.
+  springStrength: 0.004,
 
-// track pointer movement
+  // Higher value preserves movement longer.
+  damping: 0.94,
+
+  // Size of the transparent reveal.
+  revealRadius: 34,
+
+  // Blue mask color.
+  maskColor: "#1265ef"
+};
+
 const pointer = {
   x: -Infinity,
   y: -Infinity,
+
   previousX: -Infinity,
   previousY: -Infinity,
+
+  velocityX: 0,
+  velocityY: 0,
+
   active: false
-}
+};
 
-hero.addEventListener("pointermove", (event) => {
-  const rect = hero.getBoundingClientRect()
+function updatePointer(event: PointerEvent) {
+  const rect = hero.getBoundingClientRect();
 
-  pointer.previousX = pointer.x
-  pointer.previousY = pointer.y
-
-  pointer.x = event.clientX - rect.left
-  pointer.y = event.clientY - rect.top
+  const nextX = event.clientX - rect.left;
+  const nextY = event.clientY - rect.top;
 
   if (!pointer.active) {
-    pointer.previousX = pointer.x;
-    pointer.previousY = pointer.y
+    pointer.x = nextX;
+    pointer.y = nextY;
+    pointer.previousX = nextX;
+    pointer.previousY = nextY;
+    pointer.velocityX = 0;
+    pointer.velocityY = 0;
+    pointer.active = true;
+
+    return;
   }
 
-  pointer.active = true
-})
+  pointer.previousX = pointer.x;
+  pointer.previousY = pointer.y;
+
+  pointer.x = nextX;
+  pointer.y = nextY;
+
+  pointer.velocityX = pointer.x - pointer.previousX;
+  pointer.velocityY = pointer.y - pointer.previousY;
+}
+
+hero.addEventListener("pointermove", updatePointer);
 
 hero.addEventListener("pointerleave", () => {
   pointer.active = false;
-})
+  pointer.velocityX = 0;
+  pointer.velocityY = 0;
+});
 
-// resize and generate particles
 function resize() {
-  const rect = hero.getBoundingClientRect()
+  const rect = hero.getBoundingClientRect();
 
   width = rect.width;
   height = rect.height;
+
   dpr = Math.min(window.devicePixelRatio || 1, 2);
 
   canvas.width = Math.round(width * dpr);
   canvas.height = Math.round(height * dpr);
 
-  canvas.style.width = `${width}px`
-  canvas.style.height = `${height}px`
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
 
-  ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  createParticles()
+  createParticles();
 }
 
 function createParticles() {
-  particles.length = 0
+  particles.length = 0;
 
-   for (
+  for (
     let y = settings.spacing / 2;
     y < height;
     y += settings.spacing
@@ -118,61 +161,51 @@ function createParticles() {
         homeX: x,
         homeY: y,
         vx: 0,
-        vy: 0,
-        radius:
-          settings.minRadius +
-          Math.random() *
-            (settings.maxRadius - settings.minRadius)
+        vy: 0
       });
     }
   }
 }
 
-// calculate cursor velocity
-function getPointerVelocity() {
-  if (!pointer.active) {
-    return { x: 0, y: 0 }
-  }
-
-  return {
-    x: pointer.x - pointer.previousX,
-    y: pointer.y - pointer.previousY
-  }
-}
-
-// update the particles
-function updateParticle(
-  particle: Particle,
-  pointerVelocity: { x: number; y: number }
-) {
+function updateParticle(particle: Particle) {
   const dx = particle.x - pointer.x;
   const dy = particle.y - pointer.y;
   const distance = Math.hypot(dx, dy);
 
   if (
     pointer.active &&
-    distance > 0 &&
     distance < settings.influenceRadius
   ) {
-    const falloff =
+    const safeDistance = Math.max(distance, 0.001);
+
+    const normalizedDistance =
       1 - distance / settings.influenceRadius;
 
+    const falloff =
+      normalizedDistance *
+      normalizedDistance *
+      (3 - 2 * normalizedDistance);
+
     const radialForce =
-      falloff * falloff * settings.pushStrength;
+      falloff * settings.pushStrength;
 
-    const normalX = dx / distance;
-    const normalY = dy / distance;
+    particle.vx +=
+      (dx / safeDistance) * radialForce;
 
-    // Push away from the pointer.
-    particle.vx += normalX * radialForce;
-    particle.vy += normalY * radialForce;
+    particle.vy +=
+      (dy / safeDistance) * radialForce;
 
-    // Carry particles slightly in the pointer's direction.
-    particle.vx += pointerVelocity.x * falloff * settings.flowStrength;
-    particle.vy += pointerVelocity.y * falloff * settings.flowStrength;
+    particle.vx +=
+      pointer.velocityX *
+      falloff *
+      settings.flowStrength;
+
+    particle.vy +=
+      pointer.velocityY *
+      falloff *
+      settings.flowStrength;
   }
 
-  // Spring force: return to the original grid position.
   particle.vx +=
     (particle.homeX - particle.x) *
     settings.springStrength;
@@ -181,7 +214,6 @@ function updateParticle(
     (particle.homeY - particle.y) *
     settings.springStrength;
 
-  // Damping: remove energy gradually.
   particle.vx *= settings.damping;
   particle.vy *= settings.damping;
 
@@ -189,34 +221,98 @@ function updateParticle(
   particle.y += particle.vy;
 }
 
-// draw the particles
-function drawParticle(particle: Particle) {
-  ctx.fillStyle = settings.color;
+function addRevealStamp(particle: Particle) {
+  const displacement = Math.hypot(
+    particle.x - particle.homeX,
+    particle.y - particle.homeY
+  );
+
+  if (displacement < 1) {
+    return;
+  }
+
+  revealStamps.push({
+    x: particle.x,
+    y: particle.y,
+    radius:
+      settings.revealRadius +
+      displacement * 0.35,
+    strength: Math.min(displacement / 25, 1)
+  });
+}
+
+function drawSolidMask() {
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = settings.maskColor;
+  ctx.fillRect(0, 0, width, height);
+}
+
+function eraseRevealStamp(stamp: RevealStamp) {
+  const gradient = ctx.createRadialGradient(
+    stamp.x,
+    stamp.y,
+    0,
+    stamp.x,
+    stamp.y,
+    stamp.radius
+  );
+
+  gradient.addColorStop(
+    0,
+    `rgba(0, 0, 0, ${stamp.strength})`
+  );
+
+  gradient.addColorStop(
+    0.55,
+    `rgba(0, 0, 0, ${stamp.strength * 0.65})`
+  );
+
+  gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+  ctx.fillStyle = gradient;
 
   ctx.beginPath();
+
   ctx.arc(
-    particle.x,
-    particle.y,
-    particle.radius,
+    stamp.x,
+    stamp.y,
+    stamp.radius,
     0,
     Math.PI * 2
   );
+
   ctx.fill();
 }
 
-// create animation loop
-function render() {
-  ctx.clearRect(0, 0, width, height);
+function drawMask() {
+  drawSolidMask();
 
-  const pointerVelocity = getPointerVelocity();
-
-  for (const particle of particles) {
-    updateParticle(particle, pointerVelocity);
-    drawParticle(particle);
+  if (revealStamps.length === 0) {
+    return;
   }
 
-  pointer.previousX = pointer.x;
-  pointer.previousY = pointer.y;
+  ctx.globalCompositeOperation = "destination-out";
+
+  for (const stamp of revealStamps) {
+    eraseRevealStamp(stamp);
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+}
+
+function render() {
+  revealStamps.length = 0;
+
+  for (const particle of particles) {
+    updateParticle(particle);
+    addRevealStamp(particle);
+  }
+
+  drawMask();
+
+  pointer.velocityX *= 0.82;
+  pointer.velocityY *= 0.82;
 
   requestAnimationFrame(render);
 }
